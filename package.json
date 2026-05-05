@@ -1,0 +1,228 @@
+{
+  "name": "academic-markdown",
+  "displayName": "Academic Markdown",
+  "description": "Advanced Markdown editor for academic papers: auto-numbering, TOC, and PDF export with page control",
+  "version": "0.1.0",
+  "publisher": "academic-md",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Formatters"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "academic-md.exportPdf",
+        "title": "Export to PDF",
+        "category": "Academic Markdown"
+      },
+      {
+        "command": "academic-md.insertFigure",
+        "title": "Insert Figure Caption",
+        "category": "Academic Markdown"
+      },
+      {
+        "command": "academic-md.insertTable",
+        "title": "Insert Table Caption",
+        "category": "Academic Markdown"
+      },
+      {
+        "command": "academic-md.insertListing",
+        "title": "Insert Code Listing Caption",
+        "category": "Academic Markdown"
+      },
+      {
+        "command": "academic-md.insertToc",
+        "title": "Insert Table of Contents",
+        "category": "Academic Markdown"
+      },
+      {
+        "command": "academic-md.openPreview",
+        "title": "Open Preview",
+        "category": "Academic Markdown"
+      },
+      {
+        "command": "academic-md.setSetting",
+        "title": "Set Setting",
+        "category": "Academic Markdown"
+      }
+    ],
+    "configuration": {
+      "title": "Academic Markdown",
+      "properties": {
+        "academic-md.pdf.paperFormat": {
+          "type": "string",
+          "default": "A4",
+          "enum": [
+            "A4",
+            "Letter",
+            "A3"
+          ],
+          "description": "Paper format for PDF export"
+        },
+        "academic-md.pdf.marginTop": {
+          "type": "string",
+          "default": "25mm",
+          "description": "Top margin for PDF (e.g. '25mm')"
+        },
+        "academic-md.pdf.marginBottom": {
+          "type": "string",
+          "default": "25mm",
+          "description": "Bottom margin for PDF"
+        },
+        "academic-md.pdf.marginLeft": {
+          "type": "string",
+          "default": "25mm",
+          "description": "Left margin for PDF"
+        },
+        "academic-md.pdf.marginRight": {
+          "type": "string",
+          "default": "25mm",
+          "description": "Right margin for PDF"
+        },
+        "academic-md.pdf.pageNumberStart": {
+          "type": "string",
+          "default": "skip-first",
+          "enum": [
+            "skip-first",
+            "always",
+            "none"
+          ],
+          "enumDescriptions": [
+            "Skip page number on the first page (cover), start from 1 on page 2",
+            "Always show page numbers starting from 1",
+            "No page numbers"
+          ],
+          "description": "Page number display mode"
+        },
+        "academic-md.numbering.sections": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-number headings (1, 1.1, 1.1.1 …)"
+        },
+        "academic-md.numbering.sectionBaseLevel": {
+          "type": "string",
+          "default": "h2",
+          "enum": ["h1", "h2"],
+          "enumDescriptions": [
+            "h1 から採番（# → 1, ## → 1.1, …）",
+            "h1 は無番号タイトル。h2 から採番（## → 1, ### → 1.1, …）"
+          ],
+          "description": "章番号を付け始める見出しレベル"
+        },
+        "academic-md.numbering.figures": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-number figures"
+        },
+        "academic-md.numbering.tables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-number tables"
+        },
+        "academic-md.numbering.listings": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-number code listings"
+        },
+        "academic-md.numbering.equations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-number equations"
+        },
+        "academic-md.toc.maxDepth": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 6,
+          "description": "Maximum heading depth for TOC"
+        },
+        "academic-md.pdf.pageNumberFirstValue": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "description": "最初のページに印字するページ番号（skip-first時は2ページ目に適用）"
+        },
+        "academic-md.math.renderer": {
+          "type": "string",
+          "default": "katex",
+          "enum": [
+            "katex",
+            "mathjax"
+          ],
+          "description": "Math rendering engine"
+        },
+        "academic-md.pdf.customCssPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to a custom CSS file applied on top of the default PDF styles"
+        },
+        "academic-md.pdf.chromiumPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to Chrome/Edge executable (auto-detected if empty)"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "academic-md-bar",
+          "title": "Academic Markdown",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "academic-md-bar": [
+        {
+          "type": "webview",
+          "id": "academic-md.sidebar",
+          "name": "Academic Markdown"
+        }
+      ]
+    },
+    "markdown.markdownItPlugins": true,
+    "markdown.previewStyles": [
+      "./node_modules/katex/dist/katex.min.css",
+      "./media/style.css"
+    ],
+    "markdown.previewScripts": [
+      "./media/preview.js"
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorLangId == markdown",
+          "command": "academic-md.exportPdf",
+          "group": "academic-md"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.1",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "@traptitech/markdown-it-katex": "^3.6.0",
+    "katex": "^0.16.9",
+    "markdown-it": "^14.0.0",
+    "puppeteer-core": "^24.42.0"
+  }
+}

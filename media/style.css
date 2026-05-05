@@ -1,0 +1,369 @@
+/* ═══════════════════════════════════════════════════════════
+   Academic Markdown — Preview & PDF Styles
+   Applied to both the VS Code Markdown preview and PDF export.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Reset / base ─────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "MS Mincho",
+               "Noto Serif JP", Georgia, "Times New Roman", serif;
+  font-size: 11pt;
+  line-height: 1.9;
+  color: #111;
+  background: #fff;
+  margin: 0 auto;
+  max-width: 860px;
+  padding: 2em 2.5em;
+}
+
+/* ── Headings ─────────────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Hiragino Sans", "Yu Gothic UI", "Meiryo",
+               "Noto Sans JP", "Arial", sans-serif;
+  font-weight: bold;
+  line-height: 1.4;
+  margin-top: 1.6em;
+  margin-bottom: 0.5em;
+  page-break-after: avoid;
+}
+
+h1 {
+  font-size: 2em;
+  border-bottom: 2px solid #1a3a6b;
+  padding-bottom: 0.2em;
+  color: #1a3a6b;
+  text-align: center;
+  margin-top: 0;
+}
+
+h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #aac;
+  padding-bottom: 0.15em;
+  color: #1a3a6b;
+}
+
+h3 { font-size: 1.2em; color: #333; }
+h4 { font-size: 1.05em; color: #444; }
+h5, h6 { font-size: 1em; color: #555; }
+
+/* ── Paragraph & inline ───────────────────────────────────── */
+p {
+  margin: 0.7em 0;
+  text-align: justify;
+  text-justify: inter-ideograph;
+}
+
+a {
+  color: #1a4f9e;
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+strong { font-weight: bold; }
+em     { font-style: italic; }
+
+code {
+  font-family: "Fira Code", "JetBrains Mono", "Consolas",
+               "Source Code Pro", "Courier New", monospace;
+  font-size: 0.88em;
+  background: #f0f0f5;
+  border: 1px solid #d8d8e0;
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}
+
+/* ── Blockquote ───────────────────────────────────────────── */
+blockquote {
+  border-left: 4px solid #7090c0;
+  margin: 1em 0;
+  padding: 0.3em 1em;
+  color: #444;
+  background: #f5f8ff;
+}
+
+/* ── Horizontal rule ──────────────────────────────────────── */
+hr {
+  border: none;
+  border-top: 1px solid #ccc;
+  margin: 2em 0;
+}
+
+/* ── Lists ────────────────────────────────────────────────── */
+ul, ol {
+  padding-left: 2em;
+  margin: 0.5em 0;
+}
+li { margin: 0.2em 0; }
+
+/* ── Table ────────────────────────────────────────────────── */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  font-size: 0.95em;
+  page-break-inside: avoid;
+}
+
+th {
+  background-color: #1a3a6b;
+  color: #fff;
+  font-weight: bold;
+  padding: 0.5em 0.8em;
+  text-align: left;
+}
+
+td {
+  border: 1px solid #bbb;
+  padding: 0.4em 0.8em;
+  vertical-align: top;
+}
+
+tr:nth-child(even) td {
+  background-color: #f5f7ff;
+}
+
+/* Table caption (inserted by our plugin above the table) */
+.table-caption {
+  font-size: 0.9em;
+  color: #333;
+  text-align: center;
+  margin-bottom: 0.3em;
+  font-style: italic;
+}
+
+/* ── Figures ──────────────────────────────────────────────── */
+figure {
+  display: block;
+  margin: 1.5em auto;
+  text-align: center;
+  page-break-inside: avoid;
+}
+
+figure img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+figcaption {
+  font-size: 0.9em;
+  color: #444;
+  margin-top: 0.5em;
+  font-style: italic;
+}
+
+/* ── Code listings ────────────────────────────────────────── */
+figure.listing {
+  text-align: left;
+  background: #f8f8fc;
+  border: 1px solid #d0d0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+figure.listing figcaption.listing-caption {
+  background: #e8e8f0;
+  border-bottom: 1px solid #d0d0e0;
+  padding: 0.3em 0.9em;
+  font-size: 0.88em;
+  font-style: italic;
+  color: #333;
+  text-align: left;
+  margin: 0;
+}
+
+figure.listing pre {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.8em 1em;
+}
+
+pre {
+  background: #f4f4f8;
+  border: 1px solid #d8d8e8;
+  border-radius: 4px;
+  padding: 0.8em 1em;
+  overflow-x: auto;
+  font-size: 0.88em;
+  line-height: 1.6;
+  page-break-inside: avoid;
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* ── Equations ────────────────────────────────────────────── */
+.equation-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin: 1.4em 0;
+  overflow-x: auto;
+}
+
+.equation-content {
+  flex: 1;
+  text-align: center;
+  padding: 0 3em; /* room for the number on the right */
+}
+
+.equation-number {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.9em;
+  color: #555;
+  white-space: nowrap;
+}
+
+/* KaTeX display math override */
+.katex-display {
+  margin: 0 !important;
+}
+
+/* ── Table of Contents ────────────────────────────────────── */
+nav.toc {
+  background: #f5f7ff;
+  border: 1px solid #c0c8e8;
+  border-radius: 6px;
+  padding: 1.2em 1.8em;
+  margin: 2em 0;
+  page-break-after: always;
+}
+
+.toc-title {
+  font-family: "Hiragino Sans", "Yu Gothic UI", sans-serif;
+  font-size: 1.05em;
+  font-weight: bold;
+  color: #1a3a6b;
+  margin: 0 0 0.6em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid #bcc8e8;
+}
+
+nav.toc ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+nav.toc ul ul {
+  padding-left: 1.4em;
+  margin-top: 0.1em;
+}
+
+nav.toc li {
+  margin: 0.25em 0;
+  line-height: 1.5;
+}
+
+nav.toc a {
+  color: #1a4f9e;
+  text-decoration: none;
+  font-size: 0.95em;
+}
+
+nav.toc a:hover {
+  text-decoration: underline;
+}
+
+/* ── Cover page utility class ─────────────────────────────── */
+/* Add class="cover-page" to a <div> wrapping your title block */
+.cover-page {
+  page-break-after: always;
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+/* ── Screen preview: page separators (injected by preview.js) ── */
+@media screen {
+  /* preview.js が挿入するページ区切りバー */
+  .acad-page-sep {
+    margin: 0 -2.5em;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .acad-page-label {
+    display: block;
+    text-align: center;
+    font-size: 10px;
+    font-family: var(--vscode-font-family, sans-serif);
+    color: #7a8099;
+    letter-spacing: 0.08em;
+    padding-top: 6px;
+    padding-bottom: 2px;
+  }
+
+  .acad-page-bar {
+    display: block;
+    height: 20px;
+    background: #d8dce6;
+    border-top: 2px solid #b0b8cc;
+    border-bottom: 2px solid #b0b8cc;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.08);
+  }
+
+  /* --- で挿入される手動ページ区切り */
+  .manual-pagebreak {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 4px -2.5em;
+    height: 24px;
+    background: #ccd4e8;
+    border-top: 2px solid #9aaacf;
+    border-bottom: 2px solid #9aaacf;
+  }
+  .manual-pagebreak::after {
+    content: "─── 手動ページ区切り (---) ───";
+    font-size: 10px;
+    color: #5a6585;
+    letter-spacing: 0.06em;
+  }
+}
+
+/* ── Print / PDF specific ─────────────────────────────────── */
+@media print {
+  body {
+    max-width: none;
+    padding: 0;
+  }
+
+  a { color: inherit; }
+
+  pre, figure, table, .listing { page-break-inside: avoid; }
+  h2, h3, h4 { page-break-after: avoid; }
+
+  /* --- によるページ強制改ページ */
+  .manual-pagebreak {
+    display: block;
+    height: 0;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  /* preview.js が挿入するセパレータは PDF では非表示 */
+  .acad-page-sep { display: none !important; }
+}
