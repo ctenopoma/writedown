@@ -2,7 +2,7 @@
   "name": "academic-markdown",
   "displayName": "Academic Markdown",
   "description": "Advanced Markdown editor for academic papers: auto-numbering, TOC, and PDF export with page control",
-  "version": "0.1.0",
+  "version": "0.0.2",
   "publisher": "academic-md",
   "engines": {
     "vscode": "^1.85.0"
@@ -109,7 +109,10 @@
         "academic-md.numbering.sectionBaseLevel": {
           "type": "string",
           "default": "h2",
-          "enum": ["h1", "h2"],
+          "enum": [
+            "h1",
+            "h2"
+          ],
           "enumDescriptions": [
             "h1 から採番（# → 1, ## → 1.1, …）",
             "h1 は無番号タイトル。h2 から採番（## → 1, ### → 1.1, …）"
@@ -194,6 +197,8 @@
       "./media/style.css"
     ],
     "markdown.previewScripts": [
+      "./media/mermaid.min.js",
+      "./media/mermaid-init.js",
       "./media/preview.js"
     ],
     "menus": {
@@ -207,22 +212,25 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "node esbuild.js --production",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js",
     "pretest": "npm run compile",
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
+    "@traptitech/markdown-it-katex": "^3.6.0",
     "@types/markdown-it": "^14.1.1",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "esbuild": "^0.28.0",
+    "highlight.js": "^11.11.1",
+    "markdown-it": "^14.0.0",
+    "mermaid": "10.9.1",
     "typescript": "^5.3.0"
   },
   "dependencies": {
-    "@traptitech/markdown-it-katex": "^3.6.0",
     "katex": "^0.16.9",
-    "markdown-it": "^14.0.0",
     "puppeteer-core": "^24.42.0"
   }
 }

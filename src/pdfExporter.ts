@@ -33,6 +33,7 @@
 
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import * as vscode from "vscode";
 
 // We import puppeteer-core lazily to avoid load-time failures when it is not
@@ -58,8 +59,14 @@ export interface PdfExportOptions {
 export class PdfExporter {
   private config: vscode.WorkspaceConfiguration;
 
-  constructor() {
+  constructor(private readonly extensionPath: string) {
     this.config = vscode.workspace.getConfiguration("academic-md");
+  }
+
+  /** 拡張インストールディレクトリ内のパスを file:// URL に変換 */
+  private toFileUrl(relativePath: string): string {
+    const abs = path.join(this.extensionPath, relativePath).replace(/\\/g, "/");
+    return `file:///${abs}`;
   }
 
   async export(options: PdfExportOptions): Promise<string> {
@@ -74,17 +81,27 @@ export class PdfExporter {
       customCss += "\n" + fs.readFileSync(customCssPath, "utf-8");
     }
 
-    const html = this.buildFullHtml(options.htmlContent, customCss);
+    // プレビュー用の mermaid-source ブロックを PDF 用 mermaid ブロックに変換
+    const bodyHtml = options.htmlContent.replace(
+      /<div class="mermaid-source">[\s\S]*?<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>\s*<\/div>/g,
+      (_match, inner) => `<div class="mermaid">${inner.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")}</div>`
+    );
+
+    const html = this.buildFullHtml(bodyHtml, customCss);
+
+    // Write to a temp file so that file:// asset URLs resolve correctly
+    const tempPath = path.join(os.tmpdir(), `academic-md-${Date.now()}.html`);
+    fs.writeFileSync(tempPath, html, "utf-8");
 
     let browser: Browser | undefined;
     try {
       browser = await this.launchBrowser();
       const page = await browser.newPage();
 
-      await page.setContent(html, { waitUntil: "networkidle0" });
+      const tempUrl = "file:///" + tempPath.replace(/\\/g, "/");
+      await page.goto(tempUrl, { waitUntil: "networkidle0" });
 
-      // Let MathJax / KaTeX finish rendering
-      await this.waitForMath(page);
+      await this.waitForRender(page);
 
       const pdfBuffer = await page.pdf(this.buildPdfOptions(outputPath));
 
@@ -92,6 +109,7 @@ export class PdfExporter {
       return outputPath;
     } finally {
       await browser?.close();
+      fs.unlink(tempPath, () => {});
     }
   }
 
@@ -217,12 +235,13 @@ export class PdfExporter {
   // ──────────────────────────────────────────────
 
   private buildFullHtml(bodyHtml: string, extraCss: string): string {
-    const katexCdn = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist";
-    const hljsCdn  = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0";
+    // ── ローカルアセット（CDN 不要・オフライン対応） ──────────────
+    const katexCss   = this.toFileUrl("node_modules/katex/dist/katex.min.css");
+    const hljsCss    = this.toFileUrl("media/hljs-github.min.css");
+    const hljsJs     = this.toFileUrl("media/highlight.min.js");
+    const mermaidJs  = this.toFileUrl("media/mermaid.min.js");
 
     const pageNumberMode = this.config.get<string>("pdf.pageNumberStart", "skip-first");
-    // @page :first shrinks the first page's bottom margin so the Puppeteer
-    // footer (needs ~10 mm) is clipped — effectively hiding it on the cover.
     const skipFirstCss = pageNumberMode === "skip-first"
       ? "@page :first { margin-bottom: 5mm !important; }"
       : "";
@@ -233,21 +252,31 @@ export class PdfExporter {
   <meta charset="UTF-8">
   <title>Academic Markdown Export</title>
 
-  <!-- highlight.js: syntax highlighting for code blocks (runs synchronously on DOMContentLoaded) -->
-  <link rel="stylesheet" href="${hljsCdn}/styles/github.min.css">
-  <script src="${hljsCdn}/highlight.min.js"></script>
+  <!-- highlight.js (ローカル) -->
+  <link rel="stylesheet" href="${hljsCss}">
+  <script src="${hljsJs}"></script>
   <script>document.addEventListener('DOMContentLoaded', function(){ hljs.highlightAll(); });</script>
 
-  <!-- KaTeX: math rendering -->
-  <link rel="stylesheet" href="${katexCdn}/katex.min.css">
-  <script defer src="${katexCdn}/katex.min.js"></script>
-  <script defer src="${katexCdn}/contrib/auto-render.min.js"
-    onload="renderMathInElement(document.body,{
-      delimiters:[
-        {left:'$$',right:'$$',display:true},
-        {left:'$', right:'$', display:false}
-      ]
-    }); window._katexDone=true;"></script>
+  <!-- KaTeX CSS (ローカル・フォントも file:// 経由で解決) -->
+  <!-- 数式は markdown-it プラグインでサーバーサイドレンダリング済み -->
+  <link rel="stylesheet" href="${katexCss}">
+  <script>window._katexDone = true;</script>
+
+  <!-- Mermaid (ローカル) -->
+  <script src="${mermaidJs}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var mermaidApi = (typeof mermaid !== 'undefined' && mermaid.default) ? mermaid.default : mermaid;
+      if (!mermaidApi) {
+        window._mermaidDone = true;
+        return;
+      }
+      mermaidApi.initialize({ startOnLoad: false, theme: 'default' });
+      mermaidApi.run({ querySelector: 'div.mermaid' })
+        .then(function() { window._mermaidDone = true; })
+        .catch(function() { window._mermaidDone = true; });
+    });
+  </script>
 
   <style>
     @page {
@@ -316,24 +345,15 @@ ${bodyHtml}
   // Wait for math rendering
   // ──────────────────────────────────────────────
 
-  private async waitForMath(page: Page): Promise<void> {
-    // Wait for KaTeX auto-render to set the _katexDone flag (set in onload of auto-render.min.js)
+  private async waitForRender(page: Page): Promise<void> {
+    // Mermaid ダイアグラムのレンダリング完了を待つ
     await page
-      .waitForFunction(() => (globalThis as Record<string, unknown>)["_katexDone"] === true, {
-        timeout: 10_000,
+      .waitForFunction(() => (globalThis as Record<string, unknown>)["_mermaidDone"] === true, {
+        timeout: 15_000,
       })
-      .catch(() => { /* KaTeX not loaded or timed out — proceed anyway */ });
+      .catch(() => {});
 
-    // If MathJax is present, wait for it
-    await page.evaluate(async () => {
-      const g = globalThis as Record<string, any>;
-      if (typeof g["MathJax"] !== "undefined") {
-        await g["MathJax"].startup?.promise;
-        await g["MathJax"].typesetPromise?.();
-      }
-    }).catch(() => {});
-
-    // Small tick for highlight.js (synchronous but scheduled via DOMContentLoaded)
-    await page.evaluate(() => new Promise<void>((r) => setTimeout(r, 50)));
+    // highlight.js・その他の同期処理が終わるまで少し待つ
+    await page.evaluate(() => new Promise<void>((r) => setTimeout(r, 100)));
   }
 }

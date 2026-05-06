@@ -12,6 +12,7 @@ import * as fs from "fs";
 import { academicMarkdownPlugin, AcademicPluginOptions } from "./markdownItPlugin";
 import { PdfExporter } from "./pdfExporter";
 import { AcademicSidebarProvider } from "./sidebarProvider";
+import { AcademicPreviewPanel } from "./previewPanel";
 
 // ──────────────────────────────────────────────
 // Extension lifecycle
@@ -30,7 +31,7 @@ export function activate(context: vscode.ExtensionContext): ReturnType<typeof re
   // 3. Commands
   context.subscriptions.push(
     vscode.commands.registerCommand("academic-md.exportPdf", exportPdfCommand),
-    vscode.commands.registerCommand("academic-md.openPreview", openPreviewCommand),
+    vscode.commands.registerCommand("academic-md.openPreview", () => openPreviewCommand(context)),
     vscode.commands.registerCommand("academic-md.insertFigure", insertFigureCommand),
     vscode.commands.registerCommand("academic-md.insertTable", insertTableCommand),
     vscode.commands.registerCommand("academic-md.insertListing", insertListingCommand),
@@ -125,7 +126,9 @@ async function exportPdfCommand(): Promise<void> {
         const cssPath = path.join(__dirname, "..", "media", "style.css");
         const css = fs.existsSync(cssPath) ? fs.readFileSync(cssPath, "utf-8") : "";
 
-        const exporter = new PdfExporter();
+        // __dirname は out/ なので、その親が拡張ルート
+        const extensionPath = path.join(__dirname, "..");
+        const exporter = new PdfExporter(extensionPath);
         progress.report({ increment: 30, message: "PDFを書き出し中…" });
 
         const outPath = await exporter.export({
@@ -198,9 +201,14 @@ async function renderMarkdownToHtml(
 // Preview command
 // ──────────────────────────────────────────────
 
-function openPreviewCommand(): void {
-  // VS Code 組み込みの Markdown プレビューをサイドに開く
-  vscode.commands.executeCommand("markdown.showPreviewToSide");
+function openPreviewCommand(context: vscode.ExtensionContext): void {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || editor.document.languageId !== "markdown") {
+    void vscode.window.showErrorMessage("Academic Markdown: アクティブなMarkdownファイルがありません。");
+    return;
+  }
+
+  AcademicPreviewPanel.open(context.extensionUri, editor, renderMarkdownToHtml);
 }
 
 // ──────────────────────────────────────────────

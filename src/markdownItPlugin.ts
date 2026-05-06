@@ -61,6 +61,12 @@ export function academicMarkdownPlugin(
   const originalFence = md.renderer.rules.fence;
   md.renderer.rules.fence = (tokens, idx, options, env, self) => {
     const tok = tokens[idx];
+    const info = tok.info.trim().split(/\s+/)[0].toLowerCase();
+
+    if (info === "mermaid") {
+      return `<div class="mermaid">${escapeHtml(tok.content.trim())}</div>\n`;
+    }
+
     const meta = tok.meta as { listingCaption?: string; listingId?: string } | undefined;
     const base = originalFence
       ? originalFence(tokens, idx, options, env, self)

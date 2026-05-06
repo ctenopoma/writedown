@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Mermaid Debug</title>
+  <style>
+    body { background: #2b2b2b; margin: 0; padding: 24px; }
+    .markdown-body { background: #fff; color: #111; max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .markdown-body .mermaid svg text,
+    .markdown-body .mermaid svg tspan,
+    .markdown-body .mermaid svg .label,
+    .markdown-body .mermaid svg .label text,
+    .markdown-body .mermaid svg .cluster-label text,
+    .markdown-body .mermaid svg .nodeLabel,
+    .markdown-body .mermaid svg .edgeLabel,
+    .markdown-body .mermaid svg .edgeLabel p,
+    .markdown-body .mermaid svg foreignObject,
+    .markdown-body .mermaid svg foreignObject div,
+    .markdown-body .mermaid svg foreignObject span {
+      color: #111111 !important;
+      fill: #111111 !important;
+    }
+    .markdown-body .mermaid svg .edgeLabel rect,
+    .markdown-body .mermaid svg .labelBkg {
+      fill: #ffffff !important;
+    }
+  </style>
+</head>
+<body data-preview-mode="print">
+  <article class="markdown-body">
+    <div class="mermaid">
+graph LR
+    S["仕様書\nspec.md / .pdf / .zip\n## REQ-001: ログイン機能\n## REQ-002: セッション管理"]
+    TC["テスト条件\ntest_conditions.json\nTC-001: linked_req_ids: REQ-001\nTC-002: linked_req_ids: REQ-001"]
+    TM["トレーサビリティ行列\ntraceability_matrix.json\nspec_id: REQ-001\nimplemented_files: src/auth/login.py"]
+    SRC["ソースコード\nsource.zip\nsrc/auth/login.py\nsrc/auth/validators.py"]
+
+    S -->|"REQ-ID で紐付け\n(linked_req_ids)"| TC
+    S -->|"REQ-ID で紐付け\n(spec_id)"| TM
+    TC -->|"test_id で紐付け\n(linked_test_ids)"| TM
+    TM -->|"ファイルパスで参照\n(implemented_files)"| SRC
+
+    style S fill:#dde8ff,stroke:#4466cc
+    style TC fill:#ddffd8,stroke:#44aa44
+    style TM fill:#fff8cc,stroke:#aaaa44
+    style SRC fill:#ffd8d8,stroke:#cc4444
+    </div>
+  </article>
+  <script src="./media/mermaid.min.js"></script>
+  <script src="./media/mermaid-init.js"></script>
+</body>
+</html>
