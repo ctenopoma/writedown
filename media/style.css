@@ -349,8 +349,8 @@ nav.toc a:hover {
     box-shadow: inset 0 2px 4px rgba(0,0,0,0.08);
   }
 
-  /* --- で挿入される手動ページ区切り */
-  .manual-pagebreak {
+  /* --- で挿入される手動ページ区切り (PDF 出力時は非表示) */
+  body:not([data-pdf-export="true"]) .manual-pagebreak {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -360,13 +360,32 @@ nav.toc a:hover {
     border-top: 2px solid #9aaacf;
     border-bottom: 2px solid #9aaacf;
   }
-  .manual-pagebreak::after {
+  body:not([data-pdf-export="true"]) .manual-pagebreak::after {
     content: "─── 手動ページ区切り (---) ───";
     font-size: 10px;
     color: #5a6585;
     letter-spacing: 0.06em;
   }
 }
+
+/* PDF 出力時 (puppeteer は emulateMediaType('screen') で描画するため、
+   @media print ではなく属性セレクタで切り替える) */
+body[data-pdf-export="true"] .manual-pagebreak {
+  display: block;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  overflow: hidden;
+  page-break-after: always;
+  break-after: page;
+}
+body[data-pdf-export="true"] .manual-pagebreak::after,
+body[data-pdf-export="true"] .manual-pagebreak::before {
+  content: none;
+}
+body[data-pdf-export="true"] .acad-page-sep { display: none !important; }
 
 /* ── Print / PDF specific ─────────────────────────────────── */
 @media print {

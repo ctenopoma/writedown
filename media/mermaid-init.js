@@ -32,13 +32,20 @@
   }
 
   function isDarkColor(color) {
-    var match = color.match(/(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
-    if (!match) { return false; }
-    var red = Number(match[1]);
-    var green = Number(match[2]);
-    var blue = Number(match[3]);
-    var luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
-    return luminance < 0.5;
+    var r, g, b;
+    var hex = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (hex) {
+      r = parseInt(hex[1], 16);
+      g = parseInt(hex[2], 16);
+      b = parseInt(hex[3], 16);
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+    }
+    var rgb = color.match(/(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+    if (!rgb) { return false; }
+    r = Number(rgb[1]);
+    g = Number(rgb[2]);
+    b = Number(rgb[3]);
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
   }
 
   function getTheme() {
@@ -171,10 +178,15 @@
       theme: "base",
       darkMode: getTheme() === "dark",
       themeVariables: getThemeVariables(),
+      // PDF 出力側と揃える (日本語対応フォント)
+      fontFamily: '"Hiragino Sans","Yu Gothic","Meiryo",sans-serif',
       securityLevel: "loose",
       suppressErrorRendering: false,
       flowchart: {
-        htmlLabels: false,
+        // htmlLabels:true (デフォルト) — foreignObject 内に HTML として
+        // ラベルを描画する。日本語フォントの折り返しが正しく行われる。
+        htmlLabels: true,
+        useMaxWidth: true,
       },
     });
   }

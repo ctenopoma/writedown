@@ -215,6 +215,7 @@
     "vscode:prepublish": "node esbuild.js --production",
     "compile": "node esbuild.js",
     "watch": "node esbuild.js",
+    "package:vsix": "npx -y @vscode/vsce package --allow-missing-repository",
     "pretest": "npm run compile",
     "test": "node ./out/test/runTest.js"
   },
@@ -231,6 +232,7 @@
   },
   "dependencies": {
     "katex": "^0.16.9",
+    "pdf-lib": "^1.17.1",
     "puppeteer-core": "^24.42.0"
   }
 }

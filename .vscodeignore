@@ -7,3 +7,4 @@ tsconfig.json
 esbuild.js
 out/**/*.map
 *.vsix
+tmp-mermaid-debug.html

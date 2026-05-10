@@ -98,6 +98,10 @@ export class PdfExporter {
       browser = await this.launchBrowser();
       const page = await browser.newPage();
 
+      // screen モードで mermaid SVG が正しく描画されるようにする
+      // (print モードだと foreignObject や SVG text が正しくレンダリングされない)
+      await page.emulateMediaType("screen");
+
       const tempUrl = "file:///" + tempPath.replace(/\\/g, "/");
       await page.goto(tempUrl, { waitUntil: "networkidle0" });
 
@@ -105,12 +109,84 @@ export class PdfExporter {
 
       const pdfBuffer = await page.pdf(this.buildPdfOptions(outputPath));
 
-      fs.writeFileSync(outputPath, pdfBuffer);
+      // ページ番号を再計算（pageNumberFirstValue / skip-first を反映）
+      const renumbered = await this.renumberPages(pdfBuffer);
+
+      fs.writeFileSync(outputPath, renumbered);
       return outputPath;
     } finally {
       await browser?.close();
       fs.unlink(tempPath, () => {});
     }
+  }
+
+  // ──────────────────────────────────────────────
+  // PDF post-processing: renumber pages
+  // ──────────────────────────────────────────────
+  /**
+   * Puppeteer's footerTemplate uses `<span class="pageNumber">` whose text is
+   * the actual physical page index. To support `pdf.pageNumberFirstValue` and
+   * "skip-first" semantics ("page 2 should display 1"), we re-draw the footer
+   * page-number text using pdf-lib after PDF generation.
+   *
+   * Strategy:
+   *   - We told Puppeteer to print a sentinel marker `__PAGE_PLACEHOLDER__`
+   *     instead of the real page number. (See renderFooterTemplate.)
+   *   - Here we walk every page, locate the placeholder area in the footer,
+   *     redact it with a white box, and draw the desired page number.
+   */
+  private async renumberPages(pdfBuffer: Uint8Array): Promise<Uint8Array> {
+    const pageNumberMode = this.config.get<string>("pdf.pageNumberStart", "skip-first");
+    if (pageNumberMode === "none") {
+      return pdfBuffer;
+    }
+
+    const firstValue = this.config.get<number>("pdf.pageNumberFirstValue", 1);
+    const skipFirst = pageNumberMode === "skip-first";
+
+    const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+    const pdfDoc = await PDFDocument.load(pdfBuffer);
+    const font = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+
+    const pages = pdfDoc.getPages();
+    const fontSize = 10;
+
+    pages.forEach((page, idx) => {
+      const { width } = page.getSize();
+
+      // skip-first: page 1 (cover) → no number, page 2 → firstValue, ...
+      // always:    page 1 → firstValue, page 2 → firstValue + 1, ...
+      let displayNumber: number | null;
+      if (skipFirst) {
+        displayNumber = idx === 0 ? null : firstValue + idx - 1;
+      } else {
+        displayNumber = firstValue + idx;
+      }
+
+      // White-out the area where the original Puppeteer footer was drawn,
+      // so the placeholder text disappears.
+      page.drawRectangle({
+        x: 0,
+        y: 4,
+        width,
+        height: 22,
+        color: rgb(1, 1, 1),
+      });
+
+      if (displayNumber === null) { return; }
+
+      const text = String(displayNumber);
+      const textWidth = font.widthOfTextAtSize(text, fontSize);
+      page.drawText(text, {
+        x: (width - textWidth) / 2,
+        y: 12,
+        size: fontSize,
+        font,
+        color: rgb(0.27, 0.27, 0.27),
+      });
+    });
+
+    return pdfDoc.save();
   }
 
   // ──────────────────────────────────────────────
@@ -173,7 +249,7 @@ export class PdfExporter {
   // PDF options
   // ──────────────────────────────────────────────
 
-  private buildPdfOptions(outputPath: string): import("puppeteer-core").PDFOptions {
+  private buildPdfOptions(_outputPath: string): import("puppeteer-core").PDFOptions {
     const format = this.config.get<string>("pdf.paperFormat", "A4") as
       | "A4"
       | "Letter"
@@ -189,8 +265,9 @@ export class PdfExporter {
 
     const showPageNumbers = pageNumberMode !== "none";
 
+    // path は指定しない: 後処理 (renumberPages) で書き出すため、
+    // puppeteer に直接ファイルを書かせると上書きできなくなる
     return {
-      path: outputPath,
       format,
       printBackground: true,
       displayHeaderFooter: showPageNumbers,
@@ -199,7 +276,7 @@ export class PdfExporter {
         showPageNumbers ? this.renderFooterTemplate(pageNumberMode) : `<div></div>`,
       margin: {
         top: marginTop,
-        bottom: showPageNumbers ? marginBottom : marginBottom,
+        bottom: marginBottom,
         left: marginLeft,
         right: marginRight,
       },
@@ -210,24 +287,18 @@ export class PdfExporter {
   // Footer template with page-number control
   // ──────────────────────────────────────────────
   /**
-   * Puppeteer footer/header templates do NOT execute <script> tags (by design,
-   * as of Puppeteer v14+). <span class="pageNumber"> is auto-populated by the
-   * browser's print engine before the template frame is painted.
+   * Puppeteer footer/header templates do NOT execute <script> tags. The
+   * browser-injected `<span class="pageNumber">` always shows the physical
+   * page index. So we draw a placeholder string here, and overwrite it with
+   * the desired number in `renumberPages()` (pdf-lib post-processing).
    *
-   * "skip-first" strategy: inject `@page :first { margin-bottom: 5mm }` into
-   * the document CSS (see buildFullHtml). Chrome respects @page :first during
-   * print, so the first page gets a 5 mm bottom margin — too small for the
-   * footer (which needs ~10 mm) — causing it to be clipped. Pages 2+ use the
-   * normal margin and show page numbers as usual.
-   *
-   * Note: page 2 will display "2", not "1". Renumbering requires PDF
-   * post-processing (e.g. pdf-lib) which is outside this extension's scope.
+   * The template is intentionally minimal — pdf-lib draws over it anyway.
    */
   private renderFooterTemplate(_mode: string): string {
     return `<div style="
       width:100%;font-size:10pt;font-family:serif;
-      color:#444;text-align:center;padding:4mm 0 2mm;box-sizing:border-box;
-    "><span class="pageNumber"></span></div>`;
+      color:#fff;text-align:center;padding:4mm 0 2mm;box-sizing:border-box;
+    ">.</div>`;
   }
 
   // ──────────────────────────────────────────────
@@ -241,10 +312,9 @@ export class PdfExporter {
     const hljsJs     = this.toFileUrl("media/highlight.min.js");
     const mermaidJs  = this.toFileUrl("media/mermaid.min.js");
 
-    const pageNumberMode = this.config.get<string>("pdf.pageNumberStart", "skip-first");
-    const skipFirstCss = pageNumberMode === "skip-first"
-      ? "@page :first { margin-bottom: 5mm !important; }"
-      : "";
+    // ページ番号の表示・スキップは renumberPages() の後処理で行うため
+    // CSS 側で何かする必要はない
+    const skipFirstCss = "";
 
     return /* html */ `<!DOCTYPE html>
 <html lang="ja">
@@ -265,16 +335,150 @@ export class PdfExporter {
   <!-- Mermaid (ローカル) -->
   <script src="${mermaidJs}"></script>
   <script>
+    function getMermaidApi() {
+      if (typeof mermaid === 'undefined') { return null; }
+      if (mermaid && typeof mermaid.initialize === 'function' && typeof mermaid.run === 'function') {
+        return mermaid;
+      }
+      if (mermaid && mermaid.default && typeof mermaid.default.initialize === 'function' && typeof mermaid.default.run === 'function') {
+        return mermaid.default;
+      }
+      return null;
+    }
+
+    /*
+     * Chrome の page.pdf() は <foreignObject> 内 HTML を信頼性低くしか
+     * 描画しない。そこで mermaid 描画完了後に foreignObject を SVG <text>
+     * 要素に置き換えてから PDF 化する。
+     */
+    function convertForeignObjectsToSvgText() {
+      var SVG_NS = 'http://www.w3.org/2000/svg';
+      var fontFamily = '"Hiragino Sans","Yu Gothic","Meiryo",sans-serif';
+      var fos = document.querySelectorAll('.mermaid svg foreignObject');
+
+      Array.prototype.forEach.call(fos, function(fo) {
+        // 既に処理済み or 子要素なし
+        if (!fo.parentNode) { return; }
+
+        // 内部 HTML を行に分解 (<br>, <p>, <div> を改行扱い)
+        var lines = [];
+        function walk(node, currentLine) {
+          if (node.nodeType === 3) {
+            // text node
+            currentLine.text += node.nodeValue;
+            return currentLine;
+          }
+          if (node.nodeType !== 1) { return currentLine; }
+          var tag = node.tagName ? node.tagName.toLowerCase() : '';
+          if (tag === 'br') {
+            lines.push(currentLine.text);
+            return { text: '' };
+          }
+          var blockTag = (tag === 'p' || tag === 'div');
+          if (blockTag && currentLine.text) {
+            lines.push(currentLine.text);
+            currentLine = { text: '' };
+          }
+          for (var i = 0; i < node.childNodes.length; i++) {
+            currentLine = walk(node.childNodes[i], currentLine);
+          }
+          if (blockTag && currentLine.text) {
+            lines.push(currentLine.text);
+            currentLine = { text: '' };
+          }
+          return currentLine;
+        }
+        var last = walk(fo, { text: '' });
+        if (last.text) { lines.push(last.text); }
+        lines = lines
+          .map(function(s) { return s.replace(/\\s+/g, ' ').trim(); })
+          .filter(function(s) { return s.length > 0; });
+
+        if (!lines.length) {
+          var raw = (fo.textContent || '').trim();
+          if (raw) { lines = [raw]; }
+        }
+        if (!lines.length) { return; }
+
+        // foreignObject の位置とサイズ
+        var x = parseFloat(fo.getAttribute('x') || '0');
+        var y = parseFloat(fo.getAttribute('y') || '0');
+        var w = parseFloat(fo.getAttribute('width') || '0');
+        var h = parseFloat(fo.getAttribute('height') || '0');
+
+        // フォントサイズの推定: 内側の div の computed style から取得
+        var fontSize = 14;
+        var inner = fo.querySelector('div, span, p');
+        if (inner) {
+          var cs = (typeof getComputedStyle === 'function') ? getComputedStyle(inner) : null;
+          if (cs) {
+            var fs = parseFloat(cs.fontSize);
+            if (fs && !isNaN(fs)) { fontSize = fs; }
+          }
+        }
+        var lineHeight = fontSize * 1.2;
+
+        // SVG <text> を生成
+        var textEl = document.createElementNS(SVG_NS, 'text');
+        textEl.setAttribute('x', String(x + w / 2));
+        textEl.setAttribute('y', String(y + h / 2));
+        textEl.setAttribute('text-anchor', 'middle');
+        textEl.setAttribute('dominant-baseline', 'middle');
+        textEl.setAttribute('fill', '#111111');
+        textEl.setAttribute('font-family', fontFamily);
+        textEl.setAttribute('font-size', String(fontSize));
+        textEl.style.fontFamily = fontFamily;
+
+        var totalH = (lines.length - 1) * lineHeight;
+        var startY = (y + h / 2) - totalH / 2;
+
+        for (var li = 0; li < lines.length; li++) {
+          var tspan = document.createElementNS(SVG_NS, 'tspan');
+          tspan.setAttribute('x', String(x + w / 2));
+          tspan.setAttribute('y', String(startY + li * lineHeight));
+          tspan.textContent = lines[li];
+          textEl.appendChild(tspan);
+        }
+
+        fo.parentNode.replaceChild(textEl, fo);
+      });
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
-      var mermaidApi = (typeof mermaid !== 'undefined' && mermaid.default) ? mermaid.default : mermaid;
+      var mermaidApi = getMermaidApi();
       if (!mermaidApi) {
         window._mermaidDone = true;
         return;
       }
-      mermaidApi.initialize({ startOnLoad: false, theme: 'default' });
-      mermaidApi.run({ querySelector: 'div.mermaid' })
-        .then(function() { window._mermaidDone = true; })
-        .catch(function() { window._mermaidDone = true; });
+      mermaidApi.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        // 日本語フォントを明示指定 → mermaid のレイアウト計算と
+        // 後段の SVG <text> 変換でフォントが揃う
+        fontFamily: '"Hiragino Sans","Yu Gothic","Meiryo",sans-serif',
+        securityLevel: 'loose',
+        // htmlLabels:true (デフォルト) で foreignObject 内に HTML として
+        // ラベルを描画する。直後に SVG <text> へ変換するため、
+        // PDF 出力時の foreignObject 描画問題を回避できる。
+        flowchart: { htmlLabels: true, useMaxWidth: true },
+        sequence: { useMaxWidth: true },
+        gantt: { useMaxWidth: true },
+      });
+      var nodes = Array.prototype.slice.call(
+        document.querySelectorAll('div.mermaid')
+      );
+      if (!nodes.length) { window._mermaidDone = true; return; }
+      mermaidApi.run({ nodes: nodes })
+        .then(function() {
+          try { convertForeignObjectsToSvgText(); }
+          catch (e) { console.error('foreignObject -> text conversion error:', e); }
+          window._mermaidDone = true;
+        })
+        .catch(function(e) {
+          console.error('mermaid.run error:', e);
+          try { convertForeignObjectsToSvgText(); } catch (_) {}
+          window._mermaidDone = true;
+        });
     });
   </script>
 
@@ -331,11 +535,65 @@ export class PdfExporter {
     table { border-collapse:collapse; width:100%; margin:0.8em 0; page-break-inside:avoid; }
     th,td { border:1px solid #999; padding:0.4em 0.7em; text-align:left; }
     th { background:#e8e8e8; }
+
+    /* Mermaid SVG テキスト強制表示 (htmlLabels:true / false の両方に対応) */
+    .mermaid { page-break-inside: avoid; }
+    .mermaid svg { max-width: 100%; }
+    .mermaid svg text,
+    .mermaid svg tspan {
+      fill: #111111 !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+    .mermaid svg .label text,
+    .mermaid svg .label tspan,
+    .mermaid svg .cluster-label text {
+      fill: #111111 !important;
+    }
+    .mermaid svg .edgeLabel text,
+    .mermaid svg .edgeLabel tspan {
+      fill: #111111 !important;
+    }
+    .mermaid svg .edgeLabel rect,
+    .mermaid svg .labelBkg {
+      fill: #ffffff !important;
+    }
+    /* htmlLabels:true 時の foreignObject 内 HTML ラベル */
+    .mermaid svg foreignObject,
+    .mermaid svg foreignObject div,
+    .mermaid svg foreignObject span,
+    .mermaid svg foreignObject p {
+      color: #111111 !important;
+      fill: #111111 !important;
+      font-family: "Hiragino Sans","Yu Gothic","Meiryo",sans-serif !important;
+      overflow: visible !important;
+    }
+    .mermaid svg .nodeLabel,
+    .mermaid svg .edgeLabel {
+      color: #111111 !important;
+      background-color: #ffffff;
+    }
+
+    /* 手動ページ区切り (---) は PDF では非表示・強制改ページ扱い */
+    .manual-pagebreak {
+      display: block !important;
+      height: 0 !important;
+      overflow: hidden !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: transparent !important;
+      border: none !important;
+      page-break-after: always !important;
+      break-after: page !important;
+    }
+    .manual-pagebreak::after,
+    .manual-pagebreak::before { content: none !important; }
+    .acad-page-sep { display: none !important; }
   </style>
 
   <style>${extraCss}</style>
 </head>
-<body>
+<body data-pdf-export="true">
 ${bodyHtml}
 </body>
 </html>`;
@@ -353,7 +611,17 @@ ${bodyHtml}
       })
       .catch(() => {});
 
-    // highlight.js・その他の同期処理が終わるまで少し待つ
-    await page.evaluate(() => new Promise<void>((r) => setTimeout(r, 100)));
+    // フォントの読み込み完了を待つ (foreignObject 内ラベルの描画安定化)
+    await page
+      .evaluate(() => {
+        const doc = (globalThis as Record<string, unknown>)["document"] as
+          | { fonts?: { ready: Promise<unknown> } }
+          | undefined;
+        return doc?.fonts?.ready;
+      })
+      .catch(() => {});
+
+    // highlight.js・SVGフォント解決・その他の同期処理が終わるまで待つ
+    await page.evaluate(() => new Promise<void>((r) => setTimeout(r, 500)));
   }
 }
